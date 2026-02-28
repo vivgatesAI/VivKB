@@ -94,14 +94,17 @@ export default function UploadForm() {
       
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-300 mb-2">
-          Upload Document (PDF, DOCX, TXT, MD, CSV)
+          Upload Document
         </label>
         <input
           type="file"
-          accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.xml"
+          accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.json,.html,.xml"
           onChange={(e) => setFile(e.target.files?.[0] || null)}
           className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
         />
+        <p className="text-xs text-gray-400 mt-2">
+          Supported: PDF, DOCX, XLSX, PPTX, TXT, MD, CSV, JSON, HTML, XML
+        </p>
       </div>
       
       <button

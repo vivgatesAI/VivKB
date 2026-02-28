@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-async function parsePDF(fileBuffer: Buffer): Promise<string> {
+async function parsePDF(buffer: Buffer): Promise<string> {
   const PDFParser = await import('pdf2json');
   return new Promise((resolve, reject) => {
     const pdfParser = new PDFParser.default();
@@ -18,7 +18,7 @@ async function parsePDF(fileBuffer: Buffer): Promise<string> {
       resolve(text);
     });
     
-    pdfParser.parseBuffer(fileBuffer);
+    pdfParser.parseBuffer(buffer);
   });
 }
 
@@ -26,6 +26,63 @@ async function parseDOCX(buffer: Buffer): Promise<string> {
   const mammoth = await import('mammoth');
   const result = await mammoth.extractRawText({ buffer });
   return result.value;
+}
+
+async function parseXLSX(buffer: Buffer): Promise<string> {
+  const XLSX = await import('xlsx');
+  const workbook = XLSX.read(buffer, { type: 'buffer' });
+  
+  let textContent = '';
+  
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    
+    textContent += `\n=== Sheet: ${sheetName} ===\n`;
+    
+    for (const row of jsonData as any[]) {
+      if (row && row.length > 0) {
+        textContent += row.join(' | ') + '\n';
+      }
+    }
+  }
+  
+  return textContent;
+}
+
+async function parsePPTX(buffer: Buffer): Promise<string> {
+  // For PPTX, we'll try to extract text using a simple approach
+  // Read the PPTX as a zip and extract text from slides
+  const AdmZip = await import('adm-zip');
+  const zip = new AdmZip.default(buffer);
+  const zipEntries = zip.getEntries();
+  
+  let textContent = '';
+  let slideCount = 0;
+  
+  for (const entry of zipEntries) {
+    if (entry.entryName.match(/ppt\/slides\/slide\d+\.xml/)) {
+      slideCount++;
+      const content = entry.getData().toString('utf8');
+      
+      // Extract text from XML
+      const textMatches = content.match(/<a:t>([^<]+)<\/a:t>/g);
+      if (textMatches) {
+        textContent += `\n=== Slide ${slideCount} ===\n`;
+        for (const match of textMatches) {
+          const text = match.replace(/<a:t>|<\/a:t>/g, '');
+          textContent += text + ' ';
+        }
+        textContent += '\n';
+      }
+    }
+  }
+  
+  if (!textContent) {
+    throw new Error('Could not extract text from PPTX');
+  }
+  
+  return textContent;
 }
 
 export async function POST(request: Request) {
@@ -68,6 +125,14 @@ export async function POST(request: Request) {
         content = await parseDOCX(buffer);
         console.log(`DOCX parsed: ${content.length} characters`);
       }
+      else if (ext === 'xlsx' || ext === 'xls') {
+        content = await parseXLSX(buffer);
+        console.log(`Excel parsed: ${content.length} characters`);
+      }
+      else if (ext === 'pptx') {
+        content = await parsePPTX(buffer);
+        console.log(`PPTX parsed: ${content.length} characters`);
+      }
       else if (ext === 'doc') {
         return NextResponse.json({
           error: 'Old .doc format not supported. Please save as .docx or PDF.',
@@ -80,7 +145,7 @@ export async function POST(request: Request) {
     } catch (parseError: any) {
       console.error('File parsing error:', parseError);
       return NextResponse.json({
-        error: `Failed to parse file: ${parseError.message}`,
+        error: `Failed to parse ${ext.toUpperCase()} file: ${parseError.message}`,
         hint: 'Try converting to markdown first: pip install markitdown && markitdown file.ext > output.md',
       }, { status: 400 });
     }
