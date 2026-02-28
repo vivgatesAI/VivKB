@@ -4,6 +4,30 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
+async function parsePDF(fileBuffer: Buffer): Promise<string> {
+  const PDFParser = await import('pdf2json');
+  return new Promise((resolve, reject) => {
+    const pdfParser = new PDFParser.default();
+    
+    pdfParser.on('pdfParser_dataError', (err: any) => {
+      reject(new Error(`PDF parsing error: ${err.parserError}`));
+    });
+    
+    pdfParser.on('pdfParser_dataReady', () => {
+      const text = pdfParser.getRawTextContent();
+      resolve(text);
+    });
+    
+    pdfParser.parseBuffer(fileBuffer);
+  });
+}
+
+async function parseDOCX(buffer: Buffer): Promise<string> {
+  const mammoth = await import('mammoth');
+  const result = await mammoth.extractRawText({ buffer });
+  return result.value;
+}
+
 export async function POST(request: Request) {
   try {
     await initDatabase();
@@ -32,23 +56,33 @@ export async function POST(request: Request) {
     
     let content = '';
     
-    // Supported formats
-    if (ext === 'txt' || ext === 'md' || ext === 'csv' || ext === 'json' || ext === 'html' || ext === 'xml') {
-      content = buffer.toString('utf-8');
-    }
-    else if (ext === 'pdf' || ext === 'docx' || ext === 'pptx' || ext === 'xlsx') {
-      // For Office & PDF files, convert using markitdown CLI tool
-      // Install: pip install markitdown
-      // Usage: markitdown file.pdf > output.md
+    try {
+      if (ext === 'txt' || ext === 'md' || ext === 'csv' || ext === 'json' || ext === 'html' || ext === 'xml') {
+        content = buffer.toString('utf-8');
+      } 
+      else if (ext === 'pdf') {
+        content = await parsePDF(buffer);
+        console.log(`PDF parsed: ${content.length} characters`);
+      } 
+      else if (ext === 'docx') {
+        content = await parseDOCX(buffer);
+        console.log(`DOCX parsed: ${content.length} characters`);
+      }
+      else if (ext === 'doc') {
+        return NextResponse.json({
+          error: 'Old .doc format not supported. Please save as .docx or PDF.',
+        }, { status: 400 });
+      }
+      else {
+        // Try to read as text
+        content = buffer.toString('utf-8');
+      }
+    } catch (parseError: any) {
+      console.error('File parsing error:', parseError);
       return NextResponse.json({
-        error: `${ext.toUpperCase()} files need to be converted first.`,
-        hint: 'Use the markitdown tool: pip install markitdown && markitdown yourfile.pdf > output.md, then upload the .md file',
-        supportedFormats: ['txt', 'md', 'csv', 'json', 'html', 'xml'],
+        error: `Failed to parse file: ${parseError.message}`,
+        hint: 'Try converting to markdown first: pip install markitdown && markitdown file.ext > output.md',
       }, { status: 400 });
-    }
-    else {
-      // Try to read as text
-      content = buffer.toString('utf-8');
     }
     
     if (!content || content.trim().length === 0) {

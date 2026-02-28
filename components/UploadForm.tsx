@@ -61,6 +61,9 @@ export default function UploadForm() {
         }
       } else {
         setMessage('Error: ' + data.error);
+        if (data.hint) {
+          setMessage(prev => prev + '\n' + data.hint);
+        }
       }
     } catch (err: any) {
       setMessage('Error: ' + err.message);
@@ -95,7 +98,7 @@ export default function UploadForm() {
         </label>
         <input
           type="file"
-          accept=".pdf,.docx,.txt,.md,.csv,.json"
+          accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.xml"
           onChange={(e) => setFile(e.target.files?.[0] || null)}
           className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
         />
@@ -110,7 +113,7 @@ export default function UploadForm() {
       </button>
       
       {message && (
-        <p className={`mt-4 text-sm ${message.includes('Error') ? 'text-red-400' : 'text-green-400'}`}>
+        <p className={`mt-4 text-sm whitespace-pre-line ${message.includes('Error') ? 'text-red-400' : 'text-green-400'}`}>
           {message}
         </p>
       )}
