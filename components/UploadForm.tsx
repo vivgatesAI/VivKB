@@ -53,7 +53,7 @@ export default function UploadForm() {
       const data = await res.json();
       
       if (data.success) {
-        setMessage(`Uploaded ${data.addedChunks} chunks to "${data.knowledgeBase.name}"`);
+        setMessage(`✓ Uploaded ${data.addedChunks} chunks (${data.charCount} chars) to "${data.knowledgeBase.name}"`);
         setFile(null);
         fetchKnowledgeBases();
         if (!selectedKb) {
@@ -91,11 +91,11 @@ export default function UploadForm() {
       
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-300 mb-2">
-          Upload Document (TXT, MD, CSV)
+          Upload Document (PDF, DOCX, TXT, MD, CSV)
         </label>
         <input
           type="file"
-          accept=".txt,.md,.csv,.json"
+          accept=".pdf,.docx,.txt,.md,.csv,.json"
           onChange={(e) => setFile(e.target.files?.[0] || null)}
           className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
         />

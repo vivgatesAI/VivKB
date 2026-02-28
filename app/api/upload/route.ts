@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { processDocument, createKnowledgeBase, saveKnowledgeBase, loadKnowledgeBase, listKnowledgeBases, initDatabase, KnowledgeBase } from '../../../lib/knowledge-graph';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 export async function POST(request: Request) {
   try {
@@ -29,14 +32,27 @@ export async function POST(request: Request) {
     
     let content = '';
     
-    if (ext === 'txt' || ext === 'md' || ext === 'csv' || ext === 'json') {
+    // Supported formats
+    if (ext === 'txt' || ext === 'md' || ext === 'csv' || ext === 'json' || ext === 'html' || ext === 'xml') {
       content = buffer.toString('utf-8');
-    } else if (ext === 'pdf' || ext === 'docx') {
+    }
+    else if (ext === 'pdf' || ext === 'docx' || ext === 'pptx' || ext === 'xlsx') {
+      // For Office & PDF files, convert using markitdown CLI tool
+      // Install: pip install markitdown
+      // Usage: markitdown file.pdf > output.md
       return NextResponse.json({
-        error: 'For PDF/DOCX files, please convert to markdown first using: pip install markitdown && markitdown yourfile.pdf > output.md, then upload the .md file',
+        error: `${ext.toUpperCase()} files need to be converted first.`,
+        hint: 'Use the markitdown tool: pip install markitdown && markitdown yourfile.pdf > output.md, then upload the .md file',
+        supportedFormats: ['txt', 'md', 'csv', 'json', 'html', 'xml'],
       }, { status: 400 });
-    } else {
+    }
+    else {
+      // Try to read as text
       content = buffer.toString('utf-8');
+    }
+    
+    if (!content || content.trim().length === 0) {
+      return NextResponse.json({ error: 'Could not extract text from file' }, { status: 400 });
     }
     
     const chunks = await processDocument(content, file.name, knowledgeBase.id);
@@ -51,8 +67,10 @@ export async function POST(request: Request) {
         chunkCount: knowledgeBase.chunks.length,
       },
       addedChunks: chunks.length,
+      charCount: content.length,
     });
   } catch (error: any) {
+    console.error('Upload error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
