@@ -1,0 +1,9 @@
+{
+  "name": "venice-knowledge-graph",
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "numReplicas": 1
+  }
+}
